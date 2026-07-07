@@ -4,6 +4,8 @@ import asyncio
 
 from dataclasses import dataclass
 
+import sqlite3 as sql
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -38,14 +40,53 @@ class Cabin:
     cabin_number: int
     in_use: bool
 
-cabin_number_current = 1
+os.makedirs('db', exist_ok=True)
+connect = sql.connect('db/cabins.db')
+cursor = connect.cursor()
 
-cabins = []
+cursor.execute("""CREATE TABLE IF NOT EXISTS cabins (
+    camper text,
+    channel text,
+    cabin_number integer,
+    in_use integer
+    )""")
+
+try:
+    cursor.execute("""CREATE TABLE cabin_number_current (
+        val integer
+        )""")
+    cursor.execute('INSERT INTO cabin_number_current VALUES (1)')
+except:
+    pass
+
+connect.commit()
+
+cursor.execute('SELECT * FROM cabins')
+
 def get_cabin_by_camper(camper_id):
-    return next((c for c in cabins if c.camper_id == camper_id), None)
+    cursor.execute(f"SELECT * FROM cabins WHERE camper='{camper_id}'")
+    cabin_raw = cursor.fetchone()
+    return Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
 
 def get_cabin_by_number(cabin_number):
-    return next((c for c in cabins if c.cabin_number == cabin_number), None)
+    cursor.execute(f"SELECT * FROM cabins WHERE cabin_number={cabin_number}")
+    cabin_raw = cursor.fetchone()
+    return Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
+
+def append_cabin(cabin):
+    cursor.execute('INSERT INTO cabins VALUES (?, ?, ?, ?)', (str(cabin.camper_id), str(cabin.channel_id), cabin.cabin_number, int(cabin.in_use)))
+    connect.commit()
+
+def cabin_set_in_use(cabin, in_use):
+    cursor.execute('UPDATE cabins SET in_use = ? WHERE cabin_number = ?', (int(in_use), cabin.cabin_number))
+
+def cabin_number_current():
+    cursor.execute('SELECT * FROM cabin_number_current')
+    return cursor.fetchone()[0]
+
+def cabin_number_current_increment():
+    cursor.execute('UPDATE cabin_number_current SET val = ?', (cabin_number_current() + 1,))
+    connect.commit()
 
 async def get_or_make_cat(guild, cat_name):
     for c in guild.categories:
@@ -55,14 +96,11 @@ async def get_or_make_cat(guild, cat_name):
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         guild.me: discord.PermissionOverwrite(read_messages=True),
     })
-            
-    global cabin_number_current
 
 async def explode_cabin(guild, cabin):
     await guild.get_channel(cabin.channel_id).delete()
-    for i in range(0, len(cabins)):
-        if cabins[i].cabin_number == cabin.cabin_number:
-            del cabins[i]
+    cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
+    connect.commit()
 
 class Counselor(commands.Bot):
     async def on_ready(self):
@@ -78,8 +116,6 @@ class Counselor(commands.Bot):
         cabin = get_cabin_by_camper(member.id)
         if cabin:
             await explode_cabin(member.guild, cabin)
-
-
 
 bot = Counselor(command_prefix='.', intents=intents)
 
@@ -97,7 +133,7 @@ class ReviveView(discord.ui.View):
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
             interaction.guild.get_member(self.cabin.camper_id): discord.PermissionOverwrite(read_messages=True)
         })
-        self.cabin.in_use = True
+        cabin_set_in_use(self.cabin, True)
         await interaction.response.send_message('Good to go!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         self.stop()
 
@@ -123,16 +159,15 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
     if not cabins_active_category:
         cabins_active_category = await get_or_make_cat(interaction.guild, CABINS_ACTIVE_CATEGORY_NAME)
 
-    global cabin_number_current
     cabin = await cabins_active_category.create_text_channel(
-        name=f'cabin-{cabin_number_current}',
+        name=f'cabin-{cabin_number_current()}',
         overwrites={
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
             member: discord.PermissionOverwrite(read_messages=True)
         })
-    cabins.append(Cabin(member.id, cabin.id, cabin_number_current, True))
-    cabin_number_current += 1
+    append_cabin(Cabin(member.id, cabin.id, cabin_number_current(), True))
+    cabin_number_current_increment()
     await interaction.response.send_message(f'Made a cabin: <#{cabin.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
 @app_commands.default_permissions(moderate_members=True)
@@ -156,7 +191,7 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
         interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
         interaction.guild.get_member(cabin.camper_id): discord.PermissionOverwrite(read_messages=False)
     })
-    cabin.in_use = False
+    cabin_set_in_use(cabin, False)
     await interaction.response.send_message(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
 @app_commands.default_permissions(moderate_members=True)
