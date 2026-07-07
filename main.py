@@ -126,7 +126,10 @@ class Counselor(commands.Bot):
         cursor.execute(f"SELECT * FROM cabins WHERE channel={str(channel.id)}")
         cabin_raw = cursor.fetchone()
         cabin = Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
-        await explode_cabin(channel.guild, cabin)
+        if cabin:
+            await set_roles(channel.guild.get_member(cabin.camper_id), False)
+            cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
+            connect.commit()
 
 bot = Counselor(command_prefix='.', intents=intents)
 
