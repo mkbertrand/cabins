@@ -36,11 +36,16 @@ class Cabin:
     camper_id: discord.Object
     channel_id: discord.Object
     cabin_number: int
+    in_use: bool
 
 cabin_number_current = 1
 
 cabins = []
-decomissioned_cabins = []
+def get_cabin_by_camper(camper_id):
+    return next((c for c in cabins if c.camper_id == camper_id), None)
+
+def get_cabin_by_number(cabin_number):
+    return next((c for c in cabins if c.cabin_number == cabin_number), None)
 
 async def get_or_make_cat(guild, cat_name):
     for c in guild.categories:
@@ -53,6 +58,12 @@ async def get_or_make_cat(guild, cat_name):
             
     global cabin_number_current
 
+async def explode_cabin(guild, cabin):
+    await guild.get_channel(cabin.channel_id).delete()
+    for i in range(0, len(cabins)):
+        if cabins[i].cabin_number == cabin.cabin_number:
+            del cabins[i]
+
 class Counselor(commands.Bot):
     async def on_ready(self):
         print(f'Logged in as {self.user}')
@@ -64,16 +75,7 @@ class Counselor(commands.Bot):
             print(e)
 
     async def on_member_remove(self, member):
-        cabin = None
-        for c in cabins:
-            if c.camper_id == member.id:
-                cabin = c
-                break
-        if not cabin:
-            for c in decomissioned_cabins:
-                if c.camper_id == member.id:
-                    cabin = c
-                    break
+        cabin = get_cabin_by_camper(member.id)
         if cabin:
             await explode_cabin(member.guild, cabin)
 
@@ -95,8 +97,7 @@ class ReviveView(discord.ui.View):
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
             interaction.guild.get_member(self.cabin.camper_id): discord.PermissionOverwrite(read_messages=True)
         })
-        decomissioned_cabins.remove(self.cabin)
-        cabins.append(self.cabin)
+        self.cabin.in_use = True
         await interaction.response.send_message('Good to go!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         self.stop()
 
@@ -109,19 +110,18 @@ class ReviveView(discord.ui.View):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='cabin', description='Make a personal cabin for a camper.', guild=GUILD)
 async def find_cabin(interaction: discord.Interaction, member: discord.Member):
-    for cabin in cabins:
-        if cabin.camper_id == member.id:
-            await interaction.response.send_message(f'This camper already has a cabin: <#{cabin.channel_id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
-            return
+    cabin = get_cabin_by_camper(member.id)
+    if cabin and cabin.in_use:
+        await interaction.response.send_message(f'This camper already has a cabin: <#{cabin.channel_id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
+        return
+    elif cabin:
+        await interaction.response.send_message('It looks like Mosin just finished cleaning this cabin. Should I give it back to the camper?', view=ReviveView(cabin), ephemeral=BOT_COMMAND_EPHEMERALITY)
+        return
+
 
     global cabins_active_category
     if not cabins_active_category:
         cabins_active_category = await get_or_make_cat(interaction.guild, CABINS_ACTIVE_CATEGORY_NAME)
-
-    for cabin in decomissioned_cabins:
-        if cabin.camper_id == member.id:
-            await interaction.response.send_message('It looks like Mosin just finished cleaning this cabin. Should I give it back to the camper?', view=ReviveView(cabin), ephemeral=BOT_COMMAND_EPHEMERALITY)
-            return
 
     global cabin_number_current
     cabin = await cabins_active_category.create_text_channel(
@@ -131,7 +131,7 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
             member: discord.PermissionOverwrite(read_messages=True)
         })
-    cabins.append(Cabin(member.id, cabin.id, cabin_number_current))
+    cabins.append(Cabin(member.id, cabin.id, cabin_number_current, True))
     cabin_number_current += 1
     await interaction.response.send_message(f'Made a cabin: <#{cabin.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
@@ -139,13 +139,12 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
 async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
-    cabin = None
-    for c in cabins:
-        if c.cabin_number == cabin_no:
-            cabin = c
-            break
+    cabin = get_cabin_by_number(cabin_no)
     if not cabin:
         await interaction.response.send_message(f'I couldn\'t find that cabin!', ephemeral=BOT_COMMAND_EPHEMERALITY)
+        return
+    elif not cabin.in_use:
+        await interaction.response.send_message(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
     
     global cabins_decomissioned_category
@@ -157,27 +156,14 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
         interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
         interaction.guild.get_member(cabin.camper_id): discord.PermissionOverwrite(read_messages=False)
     })
-    cabins.remove(cabin)
-    decomissioned_cabins.append(cabin)
+    cabin.in_use = False
     await interaction.response.send_message(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
-
-async def explode_cabin(guild, cabin):
-    await guild.get_channel(cabin.channel_id).delete()
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='ecabin', description='Explode a camper\'s cabin.', guild=GUILD)
 async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int):
-    cabin = None
-    for c in cabins:
-        if c.cabin_number == cabin_no:
-            cabin = c
-            break
-    if not cabin:
-        for c in decomissioned_cabins:
-            if c.cabin_number == cabin_no:
-                cabin = c
-                break
+    cabin = get_cabin_by_number(cabin_no)
     if not cabin:
         await interaction.response.send_message(f'I couldn\'t find that cabin!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
