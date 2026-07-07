@@ -98,9 +98,9 @@ async def get_or_make_cat(guild, cat_name):
     })
 
 async def explode_cabin(guild, cabin):
-    await guild.get_channel(cabin.channel_id).delete()
     cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
     connect.commit()
+    await guild.get_channel(cabin.channel_id).delete()
 
 class Counselor(commands.Bot):
     async def on_ready(self):
@@ -116,6 +116,9 @@ class Counselor(commands.Bot):
         cabin = get_cabin_by_camper(member.id)
         if cabin:
             await explode_cabin(member.guild, cabin)
+
+    async def on_guild_channel_delete(self, channel):
+        cursor.execute(f"DELETE FROM cabins WHERE channel=?", (str(channel.id),))
 
 bot = Counselor(command_prefix='.', intents=intents)
 
