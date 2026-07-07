@@ -1,9 +1,8 @@
 import os
-import argparse
-import asyncio
 
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
 import sqlite3 as sql
 
 import discord
@@ -12,22 +11,19 @@ from discord import app_commands
 
 key = ''
 
-parser = argparse.ArgumentParser(description='Discord bot')
-parser.add_argument('-k', '--key', type=str, default='', help='Key for running Discord bot locally')
-args = parser.parse_args()
-if args.key:
-    key = args.key
-else:
-    key = os.environ['DISCORD_API_KEY']
-
-
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-GUILD = discord.Object(id=1524041793400733716)
-CABINS_ACTIVE_CATEGORY_NAME = 'Campsite Cabins'
-CABINS_DECOMISSIONED_CATEGORY_NAME = 'Decomissioned Cabins'
+load_dotenv()
+
+DISCORD_API_KEY = os.getenv('DISCORD_API_KEY')
+GUILD = discord.Object(id=int(os.getenv('GUILD')))
+CAMPER_ROLE = int(os.getenv('CAMPER_ROLE'))
+STAR_CAMPER_ROLE = int(os.getenv('STAR_CAMPER_ROLE'))
+
+CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
+CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
 BOT_COMMAND_EPHEMERALITY = True
 
 cabins_active_category = None
@@ -97,7 +93,16 @@ async def get_or_make_cat(guild, cat_name):
         guild.me: discord.PermissionOverwrite(read_messages=True),
     })
 
+async def set_roles(member, cabinate):
+    if cabinate:
+        await member.remove_roles(member.guild.get_role(CAMPER_ROLE))
+        await member.add_roles(member.guild.get_role(STAR_CAMPER_ROLE))
+    else:
+        await member.remove_roles(member.guild.get_role(STAR_CAMPER_ROLE))
+        await member.add_roles(member.guild.get_role(CAMPER_ROLE))
+
 async def explode_cabin(guild, cabin):
+    await set_roles(guild.get_member(cabin.camper_id), False)
     cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
     connect.commit()
     await guild.get_channel(cabin.channel_id).delete()
@@ -118,7 +123,10 @@ class Counselor(commands.Bot):
             await explode_cabin(member.guild, cabin)
 
     async def on_guild_channel_delete(self, channel):
-        cursor.execute(f"DELETE FROM cabins WHERE channel=?", (str(channel.id),))
+        cursor.execute(f"SELECT * FROM cabins WHERE channel={str(channel.id)}")
+        cabin_raw = cursor.fetchone()
+        cabin = Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
+        await explode_cabin(channel.guild, cabin)
 
 bot = Counselor(command_prefix='.', intents=intents)
 
@@ -131,12 +139,16 @@ class ReviveView(discord.ui.View):
     @discord.ui.button(label='Yes', style=discord.ButtonStyle.blurple)
     async def revive_cabin(self, interaction: discord.Interaction, button: discord.ui.Button):
 
+        member = interaction.guild.get_member(self.cabin.camper_id)
         await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites={
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
-            interaction.guild.get_member(self.cabin.camper_id): discord.PermissionOverwrite(read_messages=True)
+            member: discord.PermissionOverwrite(read_messages=True)
         })
         cabin_set_in_use(self.cabin, True)
+
+        await set_roles(member, True)
+
         await interaction.response.send_message('Good to go!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         self.stop()
 
@@ -150,6 +162,7 @@ class ReviveView(discord.ui.View):
 @bot.tree.command(name='cabin', description='Make a personal cabin for a camper.', guild=GUILD)
 async def find_cabin(interaction: discord.Interaction, member: discord.Member):
     cabin = get_cabin_by_camper(member.id)
+
     if cabin and cabin.in_use:
         await interaction.response.send_message(f'This camper already has a cabin: <#{cabin.channel_id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
@@ -157,26 +170,28 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message('It looks like Mosin just finished cleaning this cabin. Should I give it back to the camper?', view=ReviveView(cabin), ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
 
+    await set_roles(member, True)
 
     global cabins_active_category
     if not cabins_active_category:
         cabins_active_category = await get_or_make_cat(interaction.guild, CABINS_ACTIVE_CATEGORY_NAME)
 
-    cabin = await cabins_active_category.create_text_channel(
+    cabin_channel = await cabins_active_category.create_text_channel(
         name=f'cabin-{cabin_number_current()}',
         overwrites={
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
             member: discord.PermissionOverwrite(read_messages=True)
         })
-    append_cabin(Cabin(member.id, cabin.id, cabin_number_current(), True))
+    append_cabin(Cabin(member.id, cabin_channel.id, cabin_number_current(), True))
     cabin_number_current_increment()
-    await interaction.response.send_message(f'Made a cabin: <#{cabin.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
+    await interaction.response.send_message(f'Made a cabin: <#{cabin_channel.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
 async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
+
     cabin = get_cabin_by_number(cabin_no)
     if not cabin:
         await interaction.response.send_message(f'I couldn\'t find that cabin!', ephemeral=BOT_COMMAND_EPHEMERALITY)
@@ -189,10 +204,13 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
     if not cabins_decomissioned_category:
         cabins_decomissioned_category = await get_or_make_cat(interaction.guild, CABINS_DECOMISSIONED_CATEGORY_NAME)
 
+    member = interaction.guild.get_member(cabin.camper_id)
+    await set_roles(member, False)
+
     await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites={
         interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
         interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
-        interaction.guild.get_member(cabin.camper_id): discord.PermissionOverwrite(read_messages=False)
+        member: discord.PermissionOverwrite(read_messages=False)
     })
     cabin_set_in_use(cabin, False)
     await interaction.response.send_message(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
@@ -209,4 +227,4 @@ async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int)
     await explode_cabin(interaction.guild, cabin)
     await interaction.response.send_message(f'It has been done.', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
-bot.run(key)
+bot.run(DISCORD_API_KEY)
