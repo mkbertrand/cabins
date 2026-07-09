@@ -27,8 +27,6 @@ CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
 BOT_COMMAND_EPHEMERALITY = True
 
-cabin_overwrites = None
-
 cabins_active_category = None
 cabins_decomissioned_category = None
 
@@ -87,11 +85,20 @@ def cabin_number_current_increment():
     cursor.execute('UPDATE cabin_number_current SET val = ?', (cabin_number_current() + 1,))
     connect.commit()
 
+def cabin_overwrites(guild):
+    cabin_overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        guild.me: discord.PermissionOverwrite(read_messages=True)
+    }
+    for i in CABIN_KEY_HOLDERS:
+        cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
+    return cabin_overwrites
+
 async def get_or_make_cat(guild, cat_name):
     for c in guild.categories:
         if c.name == cat_name:
             return c
-    return await guild.create_category(name=cat_name, overwrites=cabin_overwrites)
+    return await guild.create_category(name=cat_name, overwrites=cabin_overwrites(guild))
 
 async def set_roles(member, cabinate):
     if cabinate:
@@ -108,14 +115,6 @@ async def explode_cabin(guild, cabin):
 class Counselor(commands.Bot):
     async def on_ready(self):
         print(f'Logged in as {self.user}')
-
-        cabin_overwrites = {
-            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
-        }
-        for i in CABIN_KEY_HOLDERS:
-            cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
-
         try:
             synced = await self.tree.sync(guild=GUILD)
             print(f'Synced {len(synced)} commands to {GUILD.id}')
@@ -148,7 +147,7 @@ class ReviveView(discord.ui.View):
     async def revive_cabin(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
         member = interaction.guild.get_member(self.cabin.camper_id)
-        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites | {
+        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites(interaction.guild)) | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
         cabin_set_in_use(self.cabin, True)
@@ -186,7 +185,7 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 
     cabin_channel = await cabins_active_category.create_text_channel(
         name=f'cabin-{cabin_number_current()}',
-        overwrites=cabin_overwrites | {
+        overwrites=cabin_overwrites(interaction.guild) | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
     append_cabin(Cabin(member.id, cabin_channel.id, cabin_number_current(), True))
@@ -213,7 +212,7 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 
     member = interaction.guild.get_member(cabin.camper_id)
     await set_roles(member, False)
-    await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites= cabin_overwrites | {
+    await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites= cabin_overwrites(interaction.guild) | {
         member: discord.PermissionOverwrite(read_messages=False)
     })
     cabin_set_in_use(cabin, False)
