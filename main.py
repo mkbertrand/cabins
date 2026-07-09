@@ -27,12 +27,7 @@ CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
 BOT_COMMAND_EPHEMERALITY = True
 
-cabin_overwrites = {
-    interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-    interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
-}
-for i in CABIN_KEY_HOLDERS:
-    cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
+cabin_overwrites = None
 
 cabins_active_category = None
 cabins_decomissioned_category = None
@@ -113,6 +108,13 @@ async def explode_cabin(guild, cabin):
 class Counselor(commands.Bot):
     async def on_ready(self):
         print(f'Logged in as {self.user}')
+
+        cabin_overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
+        }
+        for i in CABIN_KEY_HOLDERS:
+            cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
 
         try:
             synced = await self.tree.sync(guild=GUILD)
