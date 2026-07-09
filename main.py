@@ -104,7 +104,7 @@ async def set_roles(member, cabinate):
     if cabinate:
         await member.edit(roles=[STAR_CAMPER_ROLE])
     else:
-        await member.add_roles(member.guild.get_role(CAMPER_ROLES))
+        await member.edit(roles=CAMPER_ROLES)
 
 async def explode_cabin(guild, cabin):
     await set_roles(guild.get_member(cabin.camper_id), False)
