@@ -91,7 +91,7 @@ def cabin_overwrites(guild):
         guild.me: discord.PermissionOverwrite(read_messages=True)
     }
     for i in CABIN_KEY_HOLDERS:
-        cabin_overwrites[i] = discord.PermissionOverwrite(read_messages=True)
+        cabin_overwrites[guild.get_role(i)] = discord.PermissionOverwrite(read_messages=True)
     return cabin_overwrites
 
 async def get_or_make_cat(guild, cat_name):
@@ -102,7 +102,7 @@ async def get_or_make_cat(guild, cat_name):
 
 async def set_roles(member, cabinate):
     if cabinate:
-        await member.edit(roles=[STAR_CAMPER_ROLE])
+        await member.edit(roles=[member.guild.get_role(STAR_CAMPER_ROLE)])
     else:
         await member.edit(roles=list([member.guild.get_role(r) for r in CAMPER_ROLES]))
 
