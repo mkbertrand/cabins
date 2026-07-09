@@ -147,7 +147,7 @@ class ReviveView(discord.ui.View):
     async def revive_cabin(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
         member = interaction.guild.get_member(self.cabin.camper_id)
-        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites(interaction.guild)) | {
+        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites(interaction.guild) | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
         cabin_set_in_use(self.cabin, True)
