@@ -91,7 +91,7 @@ def cabin_overwrites(guild):
         guild.me: discord.PermissionOverwrite(read_messages=True)
     }
     for i in CABIN_KEY_HOLDERS:
-        cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
+        cabin_overwrites[i] = discord.PermissionOverwrite(read_messages=True)
     return cabin_overwrites
 
 async def get_or_make_cat(guild, cat_name):
