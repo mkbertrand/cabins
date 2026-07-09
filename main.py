@@ -19,12 +19,20 @@ load_dotenv()
 
 DISCORD_API_KEY = os.getenv('DISCORD_API_KEY')
 GUILD = discord.Object(id=int(os.getenv('GUILD')))
-CAMPER_ROLE = int(os.getenv('CAMPER_ROLE'))
+CAMPER_ROLES = list([int(r) for r in os.getenv('CAMPER_ROLES').split(' ')])
 STAR_CAMPER_ROLE = int(os.getenv('STAR_CAMPER_ROLE'))
+CABIN_KEY_HOLDERS = list([int(r) for r in os.getenv('CABIN_KEY_HOLDERS').split(' ')])
 
 CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
 BOT_COMMAND_EPHEMERALITY = True
+
+cabin_overwrites = {
+    interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+    interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
+}
+for i in CABIN_KEY_HOLDERS:
+    cabin_overwrites[i] = interaction.guild.me: discord.PermissionOverwrite(read_messages=True)
 
 cabins_active_category = None
 cabins_decomissioned_category = None
@@ -88,18 +96,13 @@ async def get_or_make_cat(guild, cat_name):
     for c in guild.categories:
         if c.name == cat_name:
             return c
-    return await guild.create_category(name=cat_name, overwrites={
-        guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        guild.me: discord.PermissionOverwrite(read_messages=True),
-    })
+    return await guild.create_category(name=cat_name, overwrites=cabin_overwrites)
 
 async def set_roles(member, cabinate):
     if cabinate:
-        await member.remove_roles(member.guild.get_role(CAMPER_ROLE))
-        await member.add_roles(member.guild.get_role(STAR_CAMPER_ROLE))
+        await member.edit(roles=[STAR_CAMPER_ROLE])
     else:
-        await member.remove_roles(member.guild.get_role(STAR_CAMPER_ROLE))
-        await member.add_roles(member.guild.get_role(CAMPER_ROLE))
+        await member.add_roles(member.guild.get_role(CAMPER_ROLES))
 
 async def explode_cabin(guild, cabin):
     await set_roles(guild.get_member(cabin.camper_id), False)
@@ -143,9 +146,7 @@ class ReviveView(discord.ui.View):
     async def revive_cabin(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
         member = interaction.guild.get_member(self.cabin.camper_id)
-        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites={
-            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
+        await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
         cabin_set_in_use(self.cabin, True)
@@ -183,9 +184,7 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 
     cabin_channel = await cabins_active_category.create_text_channel(
         name=f'cabin-{cabin_number_current()}',
-        overwrites={
-            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
+        overwrites=cabin_overwrites | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
     append_cabin(Cabin(member.id, cabin_channel.id, cabin_number_current(), True))
@@ -212,10 +211,7 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 
     member = interaction.guild.get_member(cabin.camper_id)
     await set_roles(member, False)
-
-    await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites={
-        interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
+    await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites= cabin_overwrites | {
         member: discord.PermissionOverwrite(read_messages=False)
     })
     cabin_set_in_use(cabin, False)
