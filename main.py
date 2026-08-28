@@ -140,10 +140,14 @@ class Counselor(commands.Bot):
                 # Ensure that cabin camper is member (raises discord.NotFound error if the user is not a member)
                 member = await guild.fetch_member(cabin.camper_id)
                 # Ensure that cabin in_use is consistent with channel's actual location (and corrects the db if not)
-                if cabin.in_use and channel.category.name == CABINS_DECOMISSIONED_CATEGORY_NAME:
+                print(channel.name)
+                print(channel.category_id)
+                category = await guild.fetch_channel(channel.category_id)
+                print(channel.category)
+                if cabin.in_use and category.name == CABINS_DECOMISSIONED_CATEGORY_NAME:
                     await set_roles(member, False)
                     cabin_set_in_use(cabin, False)
-                elif not cabin.in_use and channel.category.name == CABINS_ACTIVE_CATEGORY_NAME:
+                elif not cabin.in_use and category.name == CABINS_ACTIVE_CATEGORY_NAME:
                     await set_roles(member, True)
                     cabin_set_in_use(cabin, True)
 
