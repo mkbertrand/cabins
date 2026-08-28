@@ -101,10 +101,14 @@ async def get_or_make_cat(guild, cat_name):
     return await guild.create_category(name=cat_name, overwrites=cabin_overwrites(guild))
 
 async def set_roles(member, cabinate):
-    if cabinate:
-        await member.edit(roles=[member.guild.get_role(STAR_CAMPER_ROLE)])
-    else:
-        await member.edit(roles=list([member.guild.get_role(r) for r in CAMPER_ROLES]))
+    try:
+        if cabinate:
+            await member.edit(roles=[member.guild.get_role(STAR_CAMPER_ROLE)])
+        else:
+            await member.edit(roles=list([member.guild.get_role(r) for r in CAMPER_ROLES]))
+        return True
+    except AttributeError:
+        return False
 
 async def explode_cabin(guild, cabin):
     await set_roles(guild.get_member(cabin.camper_id), False)
@@ -229,7 +233,7 @@ async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int)
         await interaction.followup.send(f'I couldn\'t find that cabin!', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
 
+    await interaction.followup.send(f'Deleting the cabin...', ephemeral=BOT_COMMAND_EPHEMERALITY)
     await explode_cabin(interaction.guild, cabin)
-    await interaction.followup.send(f'It has been done.', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
 bot.run(DISCORD_API_KEY)
