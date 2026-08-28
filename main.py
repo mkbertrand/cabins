@@ -25,6 +25,7 @@ CABIN_KEY_HOLDERS = list([int(r) for r in os.getenv('CABIN_KEY_HOLDERS').split('
 
 CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
+DEBUG = [int(i) for i in os.getenv('DEBUG').split(',')]
 BOT_COMMAND_EPHEMERALITY = True
 
 cabins_active_category = None
@@ -206,6 +207,9 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 
     cabin = get_cabin_by_camper(member.id)
 
+    if member.guild_permissions.moderate_members and not interaction.user.id in DEBUG:
+        await interaction.followup.send('Everyone stop firing! We\'re shooting at our own men!')
+        return
     if cabin and cabin.in_use:
         await interaction.followup.send(f'This camper already has a cabin: <#{cabin.channel_id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
