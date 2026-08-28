@@ -37,6 +37,9 @@ class Cabin:
     cabin_number: int
     in_use: bool
 
+def make_cabin(cabin_raw) -> Cabin:
+    return Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
+
 os.makedirs('db', exist_ok=True)
 connect = sql.connect('db/cabins.db')
 cursor = connect.cursor()
@@ -63,12 +66,12 @@ cursor.execute('SELECT * FROM cabins')
 def get_cabin_by_camper(camper_id):
     cursor.execute(f"SELECT * FROM cabins WHERE camper='{camper_id}'")
     cabin_raw = cursor.fetchone()
-    return Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
+    return make_cabin(cabin_raw)
 
 def get_cabin_by_number(cabin_number):
     cursor.execute(f"SELECT * FROM cabins WHERE cabin_number={cabin_number}")
     cabin_raw = cursor.fetchone()
-    return Cabin(int(cabin_raw[0]), int(cabin_raw[1]), cabin_raw[2], bool(cabin_raw[3])) if cabin_raw else None
+    return make_cabin(cabin_raw)
 
 def append_cabin(cabin):
     cursor.execute('INSERT INTO cabins VALUES (?, ?, ?, ?)', (str(cabin.camper_id), str(cabin.channel_id), cabin.cabin_number, int(cabin.in_use)))
@@ -114,11 +117,40 @@ async def explode_cabin(guild, cabin):
     await set_roles(guild.get_member(cabin.camper_id), False)
     cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
     connect.commit()
-    await guild.get_channel(cabin.channel_id).delete()
+    try:
+        cabin = await guild.fetch_channel(cabin.channel_id)
+        await cabin.delete()
+    except discord.NotFound:
+        pass
 
 class Counselor(commands.Bot):
     async def on_ready(self):
         print(f'Logged in as {self.user}')
+        print('Validating cabins...')
+        guild = await self.fetch_guild(GUILD.id)
+        cursor.execute(f'SELECT * FROM cabins')
+        cabins = [make_cabin(c) for c in cursor.fetchall()]
+        # Cabin by cabin validation
+        for cabin in cabins:
+            try:
+                # Ensure that cabin exists as channel (raises discord.NotFound error if the channel does not exist)
+                channel = await guild.fetch_channel(cabin.channel_id)
+
+                # Ensure that cabin camper is member (raises discord.NotFound error if the user is not a member)
+                member = await guild.fetch_member(cabin.camper_id)
+                # Ensure that cabin in_use is consistent with channel's actual location (and corrects the db if not)
+                if cabin.in_use and channel.category.name == CABINS_DECOMISSIONED_CATEGORY_NAME:
+                    await set_roles(member, False)
+                    cabin_set_in_use(cabin, False)
+                elif not cabin.in_use and channel.category.name == CABINS_ACTIVE_CATEGORY_NAME:
+                    await set_roles(member, True)
+                    cabin_set_in_use(cabin, True)
+
+            except discord.NotFound:
+                await explode_cabin(guild, cabin)
+
+        print('Validated all cabins.')
+
         try:
             synced = await self.tree.sync(guild=GUILD)
             print(f'Synced {len(synced)} commands to {GUILD.id}')
