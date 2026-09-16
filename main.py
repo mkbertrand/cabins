@@ -214,6 +214,7 @@ class ReviveView(discord.ui.View):
     async def revive_cabin(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
         member = interaction.guild.get_member(self.cabin.camper_id)
+        cabins_active_category = await get_or_make_cat(interaction.guild, CABINS_ACTIVE_CATEGORY_NAME)
         await bot.get_channel(self.cabin.channel_id).edit(category=cabins_active_category, overwrites=cabin_overwrites(interaction.guild) | {
             member: discord.PermissionOverwrite(read_messages=True)
         })
@@ -283,7 +284,7 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
 @bot.tree.command(name='logs', description='Get PDF logs of deleted cabins.', guild=GUILD)
 async def cabin_logs(interaction: discord.Interaction):
     CABIN_LOGS = Path('cabin_logs')
-    await interaction.response.send_message('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?')
+    await interaction.send('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?')
     def check(message: discord.Message):
         return message.author == interaction.user and message.channel == interaction.channel
 
@@ -293,8 +294,7 @@ async def cabin_logs(interaction: discord.Interaction):
         await interaction.followup.send('Didn\'t hear that...')
         return
 
-    await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
-    file = Path(f'cabin_logs/{message.content}').resolve()
+    file = Path(f'cabin_logs/{response.content}').resolve()
     if not file.exists():
         await interaction.followup.send('??? ts file does not exist')
     elif not file.is_relative_to(CABIN_LOGS):
