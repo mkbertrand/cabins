@@ -144,7 +144,7 @@ async def explode_cabin(guild, cabin):
     try:
         channel = await guild.fetch_channel(cabin.channel_id)
         log = await make_cabin_log(channel)
-        with open(f'logs_cabin/{cabin.cabin_number}.pdf', 'wb') as f:
+        with open(f'cabin_logs/cabin_{cabin.cabin_number}.pdf', 'wb') as f:
             f.write(log)
         await channel.delete()
     except discord.NotFound:
