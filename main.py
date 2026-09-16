@@ -243,7 +243,7 @@ import io
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
-@bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
+@bot.tree.command(name='lcabin', description='Make a PDF log of a camper\'s cabin.', guild=GUILD)
 async def log_cabin(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
     cabin = get_cabin_by_number(cabin_no)
