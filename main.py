@@ -241,6 +241,17 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 from message_log import make_pdf, message_log
 import io
 
+def sanitize(text: str) -> str:
+    replacements = {
+        "\u2018": "'", "\u2019": "'",   # ‘ ’
+        "\u201c": '"', "\u201d": '"',   # “ ”
+        "\u2013": "-", "\u2014": "--",  # – —
+        "\u2026": "...",                # …
+    }
+    for orig, repl in replacements.items():
+        text = text.replace(orig, repl)
+    return text
+
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='lcabin', description='Make a PDF log of a camper\'s cabin.', guild=GUILD)
@@ -250,7 +261,7 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
     channel = await interaction.guild.fetch_channel(cabin.channel_id)
     messages = []
     async for message in channel.history(limit=None):
-        messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': message.content, 'created_at': message.created_at.isoformat(), 'guild_id': interaction.guild.id})
+        messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': sanitize(message.content), 'created_at': message.created_at.isoformat(), 'guild_id': interaction.guild.id})
 
     pdf = make_pdf(message_log(messages, {interaction.guild.id: interaction.guild.name}, {channel.id: channel.name}))
     await interaction.followup.send(
