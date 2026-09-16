@@ -284,7 +284,7 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
 @bot.tree.command(name='logs', description='Get PDF logs of deleted cabins.', guild=GUILD)
 async def cabin_logs(interaction: discord.Interaction):
     CABIN_LOGS = Path('cabin_logs')
-    await interaction.send('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?')
+    await interaction.response.send_message('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?')
     def check(message: discord.Message):
         return message.author == interaction.user and message.channel == interaction.channel
 
