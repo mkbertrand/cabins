@@ -105,6 +105,8 @@ async def get_or_make_cat(guild, cat_name):
     return await guild.create_category(name=cat_name, overwrites=cabin_overwrites(guild))
 
 async def set_roles(member, cabinate):
+    if member is None:
+        return False
     try:
         if cabinate:
             await member.edit(roles=[member.guild.get_role(STAR_CAMPER_ROLE)])
@@ -256,9 +258,10 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 
     member = interaction.guild.get_member(cabin.camper_id)
     await set_roles(member, False)
-    await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites= cabin_overwrites(interaction.guild) | {
-        member: discord.PermissionOverwrite(read_messages=False)
-    })
+    if member is not None:
+        await bot.get_channel(cabin.channel_id).edit(category=cabins_decomissioned_category, overwrites= cabin_overwrites(interaction.guild) | {
+            member: discord.PermissionOverwrite(read_messages=False)
+        })
     cabin_set_in_use(cabin, False)
     await interaction.followup.send(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
