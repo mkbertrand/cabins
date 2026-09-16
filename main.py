@@ -32,6 +32,8 @@ BOT_COMMAND_EPHEMERALITY = True
 cabins_active_category = None
 cabins_decomissioned_category = None
 
+os.makedirs('cabin_logs', exist_ok=True)
+
 @dataclass
 class Cabin:
     camper_id: discord.Object
@@ -142,7 +144,6 @@ async def explode_cabin(guild, cabin):
     try:
         cabin = await guild.fetch_channel(cabin.channel_id)
         log = await make_cabin_log(cabin)
-        os.makedirs('cabin_logs', exist_ok=True)
         with open(f'logs_cabin_{cabin.cabin_number}', 'w') as f:
             f.write(log)
         await cabin.delete()
