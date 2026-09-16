@@ -262,7 +262,7 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
     messages = []
     async for message in channel.history(limit=None):
         messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': sanitize(message.content), 'created_at': message.created_at.isoformat(), 'guild_id': interaction.guild.id})
-
+    messages.reverse()
     pdf = make_pdf(message_log(messages, {interaction.guild.id: interaction.guild.name}, {channel.id: channel.name}))
     await interaction.followup.send(
         file=discord.File(io.BytesIO(pdf), filename=f'logs_cabin_{cabin_no}.pdf'),

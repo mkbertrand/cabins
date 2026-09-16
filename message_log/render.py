@@ -23,6 +23,7 @@ _env = Environment(
 
 _FONT_DIRS = (
     os.path.expanduser("~/.local/share/fonts/courier-prime"),
+    "/usr/share/fonts/opentype/courier-prime",
     "/usr/share/fonts/truetype/courier-prime",
     "/usr/share/fonts/TTF",
 )
@@ -52,17 +53,18 @@ def build_message_list(messages, guild_names: dict, channel_names: dict) -> list
     last_shown: datetime | None = None
     last_gid = last_cid = None
     for m in messages:
-        gid, cid = m["guild_id"], m["channel_id"]
+        gid, cid, aid = m["guild_id"], m["channel_id"], m['author_id']
         show_guild = gid != last_gid
         show_channel = show_guild or cid != last_cid
         if show_channel:
             last_shown = None   # a new channel segment always shows its header row
-        last_gid, last_cid = gid, cid
 
         dt = _parse(m["created_at"])
-        show_header = last_shown is None or dt is None or dt - last_shown > HEADER_GAP
+        show_header = last_shown is None or dt is None or dt - last_shown > HEADER_GAP or last_aid != aid
         if show_header and dt is not None:
             last_shown = dt
+
+        last_gid, last_cid, last_aid = gid, cid, aid
 
         result.append({
             "timestamp": format_dt(m["created_at"]),
