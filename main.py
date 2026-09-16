@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dataclasses import dataclass
 
@@ -116,12 +117,34 @@ async def set_roles(member, cabinate):
     except AttributeError:
         return False
 
+def sanitize(text: str) -> str:
+    replacements = {
+        "\u2018": "'", "\u2019": "'",   # ‘ ’
+        "\u201c": '"', "\u201d": '"',   # “ ”
+        "\u2013": "-", "\u2014": "--",  # – —
+        "\u2026": "...",                # …
+    }
+    for orig, repl in replacements.items():
+        text = text.replace(orig, repl)
+    return text
+
+async def make_cabin_log(channel):
+    messages = []
+    async for message in channel.history(limit=None):
+        messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': sanitize(message.content), 'created_at': message.created_at.isoformat(), 'guild_id': channel.guild.id})
+    messages.reverse()
+    return make_pdf(message_log(messages, {channel.guild.id: channel.guild.name}, {channel.id: channel.name}))
+
 async def explode_cabin(guild, cabin):
     await set_roles(guild.get_member(cabin.camper_id), False)
     cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
     connect.commit()
     try:
         cabin = await guild.fetch_channel(cabin.channel_id)
+        log = await make_cabin_log(cabin)
+        os.makedirs('cabin_logs', exist_ok=True)
+        with open(f'logs_cabin_{cabin.cabin_number}', 'w') as f:
+            f.write(log)
         await cabin.delete()
     except discord.NotFound:
         pass
@@ -241,29 +264,14 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
 from message_log import make_pdf, message_log
 import io
 
-def sanitize(text: str) -> str:
-    replacements = {
-        "\u2018": "'", "\u2019": "'",   # ‘ ’
-        "\u201c": '"', "\u201d": '"',   # “ ”
-        "\u2013": "-", "\u2014": "--",  # – —
-        "\u2026": "...",                # …
-    }
-    for orig, repl in replacements.items():
-        text = text.replace(orig, repl)
-    return text
-
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
-@bot.tree.command(name='lcabin', description='Make a PDF log of a camper\'s cabin.', guild=GUILD)
+@bot.tree.command(name='log', description='Make a PDF log of a camper\'s cabin.', guild=GUILD)
 async def log_cabin(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
     cabin = get_cabin_by_number(cabin_no)
     channel = await interaction.guild.fetch_channel(cabin.channel_id)
-    messages = []
-    async for message in channel.history(limit=None):
-        messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': sanitize(message.content), 'created_at': message.created_at.isoformat(), 'guild_id': interaction.guild.id})
-    messages.reverse()
-    pdf = make_pdf(message_log(messages, {interaction.guild.id: interaction.guild.name}, {channel.id: channel.name}))
+    pdf = await make_cabin_log(channel)
     await interaction.followup.send(
         file=discord.File(io.BytesIO(pdf), filename=f'logs_cabin_{cabin_no}.pdf'),
         ephemeral=True,
@@ -271,7 +279,31 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
-@bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
+@bot.tree.command(name='logs', description='Get PDF logs of deleted cabins.', guild=GUILD)
+async def cabin_logs(interaction: discord.Interaction):
+    CABIN_LOGS = Path('cabin_logs')
+    await interaction.response.send_message('We have the following files:\n' + [f.name for f in CABIN_LOGS.iterdir()].join('\n') + '\nWhich one would you like to download?')
+    def check(message: discord.Message):
+        return message.author == interaction.user and message.channel == interaction.channel
+
+    try:
+        response = await interaction.client.wait_for('message', check=check, timeout=60.0)
+    except TimeoutError:
+        await interaction.followup.send('Didn\'t hear that...')
+        return
+
+    await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
+    file = Path(f'cabin_logs/{message.content}').resolve()
+    if not file.exists():
+        await interaction.followup.send('??? ts file does not exist')
+    elif not file.is_relative_to(CABIN_LOGS):
+        await interaction.followup.send('Nice try :)')
+    else:
+        await interaction.followup.send(content='Here\'s the cabin log:', file=discord.File(file))
+
+@app_commands.default_permissions(moderate_members=True)
+@app_commands.checks.has_permissions(moderate_members=True)
+@bot.tree.command(name='decommission', description='Decomission a camper\'s cabin.', guild=GUILD)
 async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
@@ -298,7 +330,7 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
-@bot.tree.command(name='ecabin', description='Explode a camper\'s cabin.', guild=GUILD)
+@bot.tree.command(name='explode', description='Explode a camper\'s cabin.', guild=GUILD)
 async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
