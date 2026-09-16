@@ -283,24 +283,24 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='logs', description='Get PDF logs of deleted cabins.', guild=GUILD)
 async def cabin_logs(interaction: discord.Interaction):
-    CABIN_LOGS = Path('cabin_logs')
-    await interaction.response.send_message('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?')
+    CABIN_LOGS = Path('cabin_logs').resolve()
+    await interaction.response.send_message('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?', ephemeral=BOT_COMMAND_EPHEMERALITY)
     def check(message: discord.Message):
         return message.author == interaction.user and message.channel == interaction.channel
 
     try:
         response = await interaction.client.wait_for('message', check=check, timeout=60.0)
     except TimeoutError:
-        await interaction.followup.send('Didn\'t hear that...')
+        await interaction.followup.send('Didn\'t hear that...', ephemeral=BOT_COMMAND_EPHEMERALITY)
         return
 
     file = Path(f'cabin_logs/{response.content}.pdf').resolve()
     if not file.exists():
-        await interaction.followup.send('??? ts file does not exist')
+        await interaction.followup.send('??? ts file does not exist', ephemeral=BOT_COMMAND_EPHEMERALITY)
     elif not file.is_relative_to(CABIN_LOGS):
-        await interaction.followup.send('Nice try :)')
+        await interaction.followup.send('Nice try :)', ephemeral=BOT_COMMAND_EPHEMERALITY)
     else:
-        await interaction.followup.send(content='Here\'s the cabin log:', file=discord.File(file))
+        await interaction.followup.send(content='Here\'s the cabin log:', file=discord.File(file), ephemeral=BOT_COMMAND_EPHEMERALITY)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
