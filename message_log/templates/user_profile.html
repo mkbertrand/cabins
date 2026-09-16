@@ -1,0 +1,53 @@
+{#
+  fpdf2's write_html has NO <style>/stylesheet support and only reads a few
+  inline-style properties: color, font-size, line-height, width, break-before,
+  break-after. So styling lives here as inline style="" attributes, with the
+  values collected below so they only need changing in one place. This
+  template is self-contained -- it does not share state with message_log.html,
+  even when a caller concatenates both fragments into one PDF.
+
+  Font family is whatever the caller set via pdf.set_font() before write_html
+  (currently Courier Prime, registered for both the regular and bold slots so
+  every weight renders at the normal weight); it cannot be changed from the markup.
+#}
+{#- fpdf2's default heading colour is dark red; override it explicitly. -#}
+{%- set S_H1        = "color: #1a1a1a; font-size: 20pt" -%}
+{%- set S_GENERATED = "color: #999999; font-size: 8pt" -%}
+{%- set S_H2        = "color: #050505; font-size: 13pt" -%}
+{%- set S_TH        = "color: #555555; font-size: 9pt" -%}
+{%- set S_TD        = "font-size: 10pt" -%}
+{%- set S_LI        = "font-size: 10pt" -%}
+{%- set S_BODY      = "font-size: 11pt" -%}
+
+<h1 style="{{ S_H1 }}">User profile: {{ subject.name }}</h1>
+<p style="{{ S_GENERATED }}">Generated {{ generated_at }}</p>
+
+<h2 style="{{ S_H2 }}">Overview</h2>
+<table>
+  <thead>
+    <tr><th style="{{ S_TH }}">Field</th><th style="{{ S_TH }}">Value</th></tr>
+  </thead>
+  <tbody>
+    <tr><td style="{{ S_TD }}">User ID</td><td style="{{ S_TD }}">{{ subject.id }}</td></tr>
+    <tr><td style="{{ S_TD }}">Account created</td><td style="{{ S_TD }}">{{ subject.account_created }}</td></tr>
+    {% if subject.is_member %}
+    <tr><td style="{{ S_TD }}">Joined server</td><td style="{{ S_TD }}">{{ subject.joined_server }}</td></tr>
+    {% else %}
+    <tr><td style="{{ S_TD }}">Server member</td><td style="{{ S_TD }}">Not currently in the server</td></tr>
+    {% endif %}
+    <tr><td style="{{ S_TD }}">Activity score</td><td style="{{ S_TD }}">{{ activity_score }}</td></tr>
+    <tr><td style="{{ S_TD }}">Logged messages</td><td style="{{ S_TD }}">{{ total_messages }}</td></tr>
+    <tr><td style="{{ S_TD }}">First logged</td><td style="{{ S_TD }}">{{ first_logged }}</td></tr>
+    <tr><td style="{{ S_TD }}">Last logged</td><td style="{{ S_TD }}">{{ last_logged }}</td></tr>
+  </tbody>
+</table>
+
+<h2 style="{{ S_H2 }}">Records from</h2>
+{#- Plain <p> lines rather than <ul>/<li> so there is no bullet. -#}
+{% if records %}
+  {% for record in records %}
+<p style="{{ S_LI }}">{{ record.guild }} &#8212; {{ record.count }} message{{ 's' if record.count != 1 else '' }}</p>
+  {% endfor %}
+{% else %}
+<p style="{{ S_BODY }}">No records.</p>
+{% endif %}

@@ -1,0 +1,57 @@
+{#
+  fpdf2's write_html has NO <style>/stylesheet support and only reads a few
+  inline-style properties: color, font-size, line-height, width, break-before,
+  break-after. So styling lives here as inline style="" attributes, with the
+  values collected below so they only need changing in one place. This
+  template is self-contained -- it does not share state with
+  user_profile.html, even when a caller concatenates both fragments into one
+  PDF.
+
+  Messages are rendered strictly chronologically (as build_message_list
+  ordered them) and are never grouped or re-sorted by guild or channel. The
+  guild and channel lines print only when the value actually changes from the
+  previous message (build_message_list's show_guild / show_channel flags) --
+  same as when messages were grouped by guild/channel, just without any
+  actual grouping.
+
+  Font family is whatever the caller set via pdf.set_font() before write_html
+  (currently Courier Prime, registered for both the regular and bold slots so
+  every weight renders at the normal weight); it cannot be changed from the markup.
+#}
+{%- set S_H2        = "color: #050505; font-size: 13pt" -%}
+{%- set S_H3        = "color: #333333; font-size: 11pt" -%}
+{%- set S_CHANNEL   = "color: #555555; font-size: 10pt" -%}
+{%- set S_META      = "font-size: 10pt" -%}
+{%- set S_BODY      = "font-size: 11pt" -%}
+{%- set C_AUTHOR    = "#28282D" -%}
+{%- set C_TIMESTAMP = "#70717A" -%}
+{%- set C_BODY      = "#2E2E34" -%}
+{#- fpdf2's write_html ignores font-size in inline style="" on block tags; the
+   only thing that changes text size is the <font size> attribute. So message
+   body / name / date sizes are all set with <font size> below. -#}
+{%- set SZ_BODY = 11 -%}
+{%- set SZ_NAME = SZ_BODY -%}   {# name matches message content #}
+{%- set SZ_DATE = 8 -%}          {# timestamp a little smaller #}
+
+<h2 style="{{ S_H2 }}">Messages</h2>
+{% for message in messages %}
+{#- Guild line: only when the guild differs from the previous message's.
+   Channel line: only when the channel differs (a guild change is always
+   also a channel change). Author/timestamp header: only when show_header is
+   set (after >3 min of silence, or -- like a fresh channel/guild always did
+   when messages were grouped -- at the start of a new channel segment).
+   Author and timestamp are coloured separately via <font>: fpdf2 resets
+   colour to black on </font> and won't inherit from <p style>. -#}
+{% if message.show_guild %}
+<h3 style="{{ S_H3 }}">{{ message.guild }}</h3>
+{% endif %}
+{% if message.show_channel %}
+<p style="{{ S_CHANNEL }}">#{{ message.channel }}</p>
+{% endif %}
+{% if message.show_header %}
+<p style="{{ S_META }}"><font color="{{ C_AUTHOR }}" size="{{ SZ_NAME }}">{{ message.author }} </font><font color="{{ C_TIMESTAMP }}" size="{{ SZ_DATE }}">{{ message.timestamp }}</font></p>
+{% endif %}
+<p><font size="{{ SZ_BODY }}" color="{{ C_BODY }}">{{ message.content or '[no text content]' }}</font></p>
+{% else %}
+<p style="{{ S_BODY }}">No logged messages.</p>
+{% endfor %}

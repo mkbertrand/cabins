@@ -238,6 +238,26 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
     cabin_number_current_increment()
     await interaction.followup.send(f'Made a cabin: <#{cabin_channel.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
 
+from message_log import make_pdf, message_log
+import io
+
+@app_commands.default_permissions(moderate_members=True)
+@app_commands.checks.has_permissions(moderate_members=True)
+@bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
+async def log_cabin(interaction: discord.Interaction, cabin_no: int):
+    await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
+    cabin = get_cabin_by_number(cabin_no)
+    channel = await interaction.guild.fetch_channel(cabin.channel_id)
+    messages = []
+    async for message in channel.history(limit=None):
+        messages.append({'message_id': message.id, 'channel_id': channel.id, 'author_id': message.author.id, 'author_name': message.author.name, 'content': message.content, 'guild_id': guild.id})
+
+    pdf = make_pdf(message_log(messages))
+    await interaction.followup.send(
+        file=discord.File(io.BytesIO(pdf), filename=f'logs_cabin_{cabin_no}.pdf'),
+        ephemeral=True,
+    )
+
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='dcabin', description='Decomission a camper\'s cabin.', guild=GUILD)
