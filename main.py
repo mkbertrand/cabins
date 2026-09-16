@@ -142,11 +142,11 @@ async def explode_cabin(guild, cabin):
     cursor.execute(f"DELETE FROM cabins WHERE camper='{cabin.camper_id}'")
     connect.commit()
     try:
-        cabin = await guild.fetch_channel(cabin.channel_id)
-        log = await make_cabin_log(cabin)
+        channel = await guild.fetch_channel(cabin.channel_id)
+        log = await make_cabin_log(channel)
         with open(f'logs_cabin_{cabin.cabin_number}', 'w') as f:
             f.write(log)
-        await cabin.delete()
+        await channel.delete()
     except discord.NotFound:
         pass
 
