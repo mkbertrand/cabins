@@ -144,8 +144,8 @@ async def explode_cabin(guild, cabin):
     try:
         channel = await guild.fetch_channel(cabin.channel_id)
         log = await make_cabin_log(channel)
-        with open(f'logs_cabin_{cabin.cabin_number}', 'w') as f:
-            f.write(log)
+        path = f'logs_cabin/{cabin.cabin_number}.pdf'
+        log.output(path)
         await channel.delete()
     except discord.NotFound:
         pass
@@ -294,7 +294,7 @@ async def cabin_logs(interaction: discord.Interaction):
         await interaction.followup.send('Didn\'t hear that...')
         return
 
-    file = Path(f'cabin_logs/{response.content}').resolve()
+    file = Path(f'cabin_logs/{response.content}.pdf').resolve()
     if not file.exists():
         await interaction.followup.send('??? ts file does not exist')
     elif not file.is_relative_to(CABIN_LOGS):
