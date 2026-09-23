@@ -357,12 +357,12 @@ async def cabin_logs(interaction: discord.Interaction):
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='decommission', description='Decomission a camper\'s cabin.', guild=GUILD)
+async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 
     if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
         await interaction.response.send_message('You\'re not allowed to use this command!')
         return
 
-async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
     cabin = get_cabin_by_number(cabin_no)
