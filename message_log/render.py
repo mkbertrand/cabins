@@ -22,9 +22,9 @@ _env = Environment(
 )
 
 _FONT_DIRS = (
-    os.path.expanduser("~/.local/share/fonts/courier-prime"),
-    "/usr/share/fonts/opentype/courier-prime",
-    "/usr/share/fonts/truetype/courier-prime",
+    os.path.expanduser("~/.local/share/fonts/noto-sans-mono"),
+    "/usr/share/fonts/opentype/noto",
+    "/usr/share/fonts/truetype/noto",
     "/usr/share/fonts/TTF",
 )
 PAGE_BACKGROUND = (0xFB, 0xFB, 0xFB)    # #FBFBFB
@@ -138,20 +138,44 @@ def _find_font(name: str) -> str | None:
     return None
 
 
+# Scripts Noto Sans Mono itself doesn't cover (it has Latin/Cyrillic/Greek
+# built in). Registered as fpdf2 fallback fonts so messages in these scripts
+# render instead of silently dropping glyphs. (family name, file, face index
+# within the file — non-zero only for the CJK .ttc collection.)
+_FALLBACK_FONTS = (
+    ("Noto Sans Mono CJK SC", "NotoSansCJK-Regular.ttc", 7),
+    ("Noto Sans Arabic", "NotoSansArabic-Regular.ttf", 0),
+    ("Noto Sans Hebrew", "NotoSansHebrew-Regular.ttf", 0),
+    ("Noto Sans Devanagari", "NotoSansDevanagari-Regular.ttf", 0),
+    ("Noto Sans Thai", "NotoSansThai-Regular.ttf", 0),
+)
+
+
 def make_pdf(html: str) -> bytes:
     """Render an HTML string (e.g. concatenated template fragments) to PDF bytes."""
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_page_background(PAGE_BACKGROUND)   # before add_page(); a str would be read as a path
 
-    regular = _find_font("CourierPrime-Regular.ttf")
+    regular = _find_font("NotoSansMono-Regular.ttf")
     if regular:
-        italic = _find_font("CourierPrime-Italic.ttf") or regular
-        pdf.add_font("Courier Prime", "", regular)
-        pdf.add_font("Courier Prime", "B", regular)   # normal weight everywhere, incl. bold contexts
-        pdf.add_font("Courier Prime", "I", italic)
-        pdf.add_font("Courier Prime", "BI", italic)
-        pdf.set_font("Courier Prime", size=11)
+        italic = _find_font("NotoSansMono-Italic.ttf") or regular   # no italic cut exists
+        pdf.add_font("Noto Sans Mono", "", regular)
+        pdf.add_font("Noto Sans Mono", "B", regular)   # normal weight everywhere, incl. bold contexts
+        pdf.add_font("Noto Sans Mono", "I", italic)
+        pdf.add_font("Noto Sans Mono", "BI", italic)
+        pdf.set_font("Noto Sans Mono", size=11)
+
+        fallback_families = []
+        for family, filename, face_index in _FALLBACK_FONTS:
+            path = _find_font(filename)
+            if path:
+                pdf.add_font(family, "", path, collection_font_number=face_index)
+                fallback_families.append(family)
+        if fallback_families:
+            # exact_match=False: fall back even when the current text is
+            # bold/italic, since these scripts are only registered as regular.
+            pdf.set_fallback_fonts(fallback_families, exact_match=False)
     else:
         pdf.set_font("Courier", size=11)
 
