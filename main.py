@@ -23,7 +23,6 @@ GUILD = discord.Object(id=int(os.getenv('GUILD')))
 CAMPER_ROLES = list([int(r) for r in os.getenv('CAMPER_ROLES').split(' ')])
 STAR_CAMPER_ROLE = int(os.getenv('STAR_CAMPER_ROLE'))
 CABIN_KEY_HOLDERS = list([int(r) for r in os.getenv('CABIN_KEY_HOLDERS').split(' ')])
-LOG_CHANNEL = None
 
 CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
@@ -158,6 +157,7 @@ class Counselor(commands.Bot):
         guild = await self.fetch_guild(GUILD.id)
         cursor.execute(f'SELECT * FROM cabins')
         cabins = [make_cabin(c) for c in cursor.fetchall()]
+        self.LOG_CHANNEL = await self.fetch_channel(int(os.getenv('LOG_CHANNEL')))
         # Cabin by cabin validation
         for cabin in cabins:
             try:
@@ -186,10 +186,9 @@ class Counselor(commands.Bot):
                     description=f'Cabin {cabin.cabin_number} was exploded (deleted) in order to optimize server feng shui.',
                     timestamp=discord.utils.utcnow()
                 )
-                await LOG_CHANNEL.send(embed=log_embed)
+                await self.LOG_CHANNEL.send(embed=log_embed)
 
         print('Validated all cabins.')
-        LOG_CHANNEL = await self.get_channel(int(os.getenv('LOG_CHANNEL')))
 
         try:
             synced = await self.tree.sync(guild=GUILD)
@@ -207,7 +206,7 @@ class Counselor(commands.Bot):
                 description=f'Cabin {cabin.cabin_number} was exploded (deleted) due to its camper leaving the server.',
                 timestamp=discord.utils.utcnow()
             )
-            await LOG_CHANNEL.send(embed=log_embed)
+            await self.LOG_CHANNEL.send(embed=log_embed)
 
     async def on_guild_channel_delete(self, channel):
         cursor.execute(f"SELECT * FROM cabins WHERE channel={str(channel.id)}")
@@ -289,7 +288,7 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
         description=f'A cabin for {member.mention} was created.',
         timestamp=discord.utils.utcnow()
     )
-    await LOG_CHANNEL.send(embed=log_embed)
+    await bot.LOG_CHANNEL.send(embed=log_embed)
 
 from message_log import make_pdf, message_log
 import io
@@ -317,7 +316,7 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
         description=f'Logs for Cabin {cabin_no} were generated.',
         timestamp=discord.utils.utcnow()
     )
-    await LOG_CHANNEL.send(embed=log_embed)
+    await bot.LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -352,7 +351,7 @@ async def cabin_logs(interaction: discord.Interaction):
             description=f'Logs for Cabin {response.content} were retrieved.',
             timestamp=discord.utils.utcnow()
         )
-        await LOG_CHANNEL.send(embed=log_embed)
+        await bot.LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -391,7 +390,7 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
         description=f'Cabin {cabin_no} was decommissioned.',
         timestamp=discord.utils.utcnow()
     )
-    await LOG_CHANNEL.send(embed=log_embed)
+    await bot.LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -417,6 +416,6 @@ async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int)
         description=f'Cabin {cabin_no} was exploded (deleted).',
         timestamp=discord.utils.utcnow()
     )
-    await LOG_CHANNEL.send(embed=log_embed)
+    await bot.LOG_CHANNEL.send(embed=log_embed)
 
 bot.run(DISCORD_API_KEY)
