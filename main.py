@@ -250,6 +250,11 @@ class ReviveView(discord.ui.View):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='cabin', description='Make a personal cabin for a camper.', guild=GUILD)
 async def find_cabin(interaction: discord.Interaction, member: discord.Member):
+
+    if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
+        await interaction.response.send_message('You\'re not allowed to use this command!')
+        return
+
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
     cabin = get_cabin_by_camper(member.id)
@@ -293,6 +298,11 @@ import io
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='log', description='Make a PDF log of a camper\'s cabin.', guild=GUILD)
 async def log_cabin(interaction: discord.Interaction, cabin_no: int):
+
+    if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
+        await interaction.response.send_message('You\'re not allowed to use this command!')
+        return
+
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
     cabin = get_cabin_by_number(cabin_no)
     channel = await interaction.guild.fetch_channel(cabin.channel_id)
@@ -313,6 +323,11 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='logs', description='Get PDF logs of deleted cabins.', guild=GUILD)
 async def cabin_logs(interaction: discord.Interaction):
+
+    if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
+        await interaction.response.send_message('You\'re not allowed to use this command!')
+        return
+
     CABIN_LOGS = Path('cabin_logs').resolve()
     await interaction.response.send_message('We have the following files:\n' + '\n'.join([f.name for f in CABIN_LOGS.iterdir()]) + '\nWhich one would you like to download?', ephemeral=BOT_COMMAND_EPHEMERALITY)
     def check(message: discord.Message):
@@ -342,6 +357,11 @@ async def cabin_logs(interaction: discord.Interaction):
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='decommission', description='Decomission a camper\'s cabin.', guild=GUILD)
+
+    if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
+        await interaction.response.send_message('You\'re not allowed to use this command!')
+        return
+
 async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
@@ -377,6 +397,11 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
 @app_commands.checks.has_permissions(moderate_members=True)
 @bot.tree.command(name='explode', description='Explode a camper\'s cabin.', guild=GUILD)
 async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int):
+
+    if not any([role.id in CABIN_KEY_HOLDERS for role in interaction.user.roles]):
+        await interaction.response.send_message('You\'re not allowed to use this command!')
+        return
+
     await interaction.response.defer(ephemeral=BOT_COMMAND_EPHEMERALITY)
 
     cabin = get_cabin_by_number(cabin_no)
