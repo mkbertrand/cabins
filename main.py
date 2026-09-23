@@ -23,6 +23,7 @@ GUILD = discord.Object(id=int(os.getenv('GUILD')))
 CAMPER_ROLES = list([int(r) for r in os.getenv('CAMPER_ROLES').split(' ')])
 STAR_CAMPER_ROLE = int(os.getenv('STAR_CAMPER_ROLE'))
 CABIN_KEY_HOLDERS = list([int(r) for r in os.getenv('CABIN_KEY_HOLDERS').split(' ')])
+LOG_CHANNEL = None
 
 CABINS_ACTIVE_CATEGORY_NAME = os.getenv('CABINS_ACTIVE_CATEGORY_NAME')
 CABINS_DECOMISSIONED_CATEGORY_NAME = os.getenv('CABINS_DECOMISSIONED_CATEGORY_NAME')
@@ -179,8 +180,16 @@ class Counselor(commands.Bot):
 
             except discord.NotFound:
                 await explode_cabin(guild, cabin)
+                log_embed = discord.Embed(
+                    title=f'A cabin was automatically exploded.',
+                    color=discord.Color.red(),
+                    description=f'Cabin {cabin.cabin_number} was exploded (deleted) in order to optimize server feng shui.',
+                    timestamp=discord.utils.utcnow()
+                )
+                await LOG_CHANNEL.send(embed=log_embed)
 
         print('Validated all cabins.')
+        LOG_CHANNEL = self.get_channel(int(os.getenv('LOG_CHANNEL')))
 
         try:
             synced = await self.tree.sync(guild=GUILD)
@@ -192,6 +201,13 @@ class Counselor(commands.Bot):
         cabin = get_cabin_by_camper(member.id)
         if cabin:
             await explode_cabin(member.guild, cabin)
+            log_embed = discord.Embed(
+                title=f'A cabin was automatically exploded.',
+                color=discord.Color.red(),
+                description=f'Cabin {cabin.cabin_number} was exploded (deleted) due to its camper leaving the server.',
+                timestamp=discord.utils.utcnow()
+            )
+            await LOG_CHANNEL.send(embed=log_embed)
 
     async def on_guild_channel_delete(self, channel):
         cursor.execute(f"SELECT * FROM cabins WHERE channel={str(channel.id)}")
@@ -262,6 +278,13 @@ async def find_cabin(interaction: discord.Interaction, member: discord.Member):
     append_cabin(Cabin(member.id, cabin_channel.id, cabin_number_current(), True))
     cabin_number_current_increment()
     await interaction.followup.send(f'Made a cabin: <#{cabin_channel.id}>', ephemeral=BOT_COMMAND_EPHEMERALITY)
+    log_embed = discord.Embed(
+        title=f'{interaction.user.name} created a cabin.',
+        color=discord.Color.red(),
+        description=f'A cabin for {member.mention} was created.',
+        timestamp=discord.utils.utcnow()
+    )
+    await LOG_CHANNEL.send(embed=log_embed)
 
 from message_log import make_pdf, message_log
 import io
@@ -278,6 +301,13 @@ async def log_cabin(interaction: discord.Interaction, cabin_no: int):
         file=discord.File(io.BytesIO(pdf), filename=f'logs_cabin_{cabin_no}.pdf'),
         ephemeral=True,
     )
+    log_embed = discord.Embed(
+        title=f'{interaction.user.name} generated cabin logs.',
+        color=discord.Color.red(),
+        description=f'Logs for Cabin {cabin_no} were generated.',
+        timestamp=discord.utils.utcnow()
+    )
+    await LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -301,6 +331,13 @@ async def cabin_logs(interaction: discord.Interaction):
         await interaction.followup.send('Nice try :)', ephemeral=BOT_COMMAND_EPHEMERALITY)
     else:
         await interaction.followup.send(content='Here\'s the cabin log:', file=discord.File(file), ephemeral=BOT_COMMAND_EPHEMERALITY)
+        log_embed = discord.Embed(
+            title=f'{interaction.user.name} retrieved cabins logs.',
+            color=discord.Color.red(),
+            description=f'Logs for Cabin {response.content} were retrieved.',
+            timestamp=discord.utils.utcnow()
+        )
+        await LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -328,6 +365,13 @@ async def decomission_cabin(interaction: discord.Interaction, cabin_no: int):
         })
     cabin_set_in_use(cabin, False)
     await interaction.followup.send(f'<#{cabin.channel_id}> is out of comission!', ephemeral=BOT_COMMAND_EPHEMERALITY)
+    log_embed = discord.Embed(
+        title=f'{interaction.user.name} decomissioned a cabin.',
+        color=discord.Color.red(),
+        description=f'Cabin {cabin_no} was decommissioned.',
+        timestamp=discord.utils.utcnow()
+    )
+    await LOG_CHANNEL.send(embed=log_embed)
 
 @app_commands.default_permissions(moderate_members=True)
 @app_commands.checks.has_permissions(moderate_members=True)
@@ -342,5 +386,12 @@ async def explode_cabin_command(interaction: discord.Interaction, cabin_no: int)
 
     await interaction.followup.send(f'Deleting the cabin...', ephemeral=BOT_COMMAND_EPHEMERALITY)
     await explode_cabin(interaction.guild, cabin)
+    log_embed = discord.Embed(
+        title=f'{interaction.user.name} exploded a cabin.',
+        color=discord.Color.red(),
+        description=f'Cabin {cabin_no} was exploded (deleted).',
+        timestamp=discord.utils.utcnow()
+    )
+    await LOG_CHANNEL.send(embed=log_embed)
 
 bot.run(DISCORD_API_KEY)
