@@ -189,7 +189,7 @@ class Counselor(commands.Bot):
                 await LOG_CHANNEL.send(embed=log_embed)
 
         print('Validated all cabins.')
-        LOG_CHANNEL = self.get_channel(int(os.getenv('LOG_CHANNEL')))
+        LOG_CHANNEL = await self.get_channel(int(os.getenv('LOG_CHANNEL')))
 
         try:
             synced = await self.tree.sync(guild=GUILD)
